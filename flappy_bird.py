@@ -11,7 +11,7 @@ import os
 import random
 import sys
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import pygame
 
@@ -30,6 +30,10 @@ FONT_NAME = "freesansbold.ttf"
 BACKGROUND_COLOR = (135, 206, 235)  # sky blue
 
 
+JUMP_SOUND: Optional[pygame.mixer.Sound] = None
+HIT_SOUND: Optional[pygame.mixer.Sound] = None
+
+
 @dataclass
 class Bird:
     """Player controlled bird."""
@@ -43,6 +47,8 @@ class Bird:
     def flap(self) -> None:
         if self.alive:
             self.velocity = FLAP_STRENGTH
+            if JUMP_SOUND:
+                JUMP_SOUND.play()
 
     def update(self) -> None:
         self.velocity += GRAVITY
@@ -59,17 +65,43 @@ class Bird:
         return pygame.Rect(int(self.x - BIRD_RADIUS), int(self.y - BIRD_RADIUS), BIRD_RADIUS * 2, BIRD_RADIUS * 2)
 
     def draw(self, surface: pygame.Surface) -> None:
-        # Bird body
-        pygame.draw.circle(surface, (255, 255, 0), (int(self.x), int(self.y)), BIRD_RADIUS)
-        # Eye
-        pygame.draw.circle(surface, (0, 0, 0), (int(self.x + 6), int(self.y - 5)), 4)
-        # Beak triangle rotated based on angle
-        beak_length = 12
-        direction = pygame.Vector2(1, 0).rotate(-self.angle)
-        tip = pygame.Vector2(self.x, self.y) + direction * (BIRD_RADIUS + beak_length)
-        base_top = pygame.Vector2(self.x, self.y) + direction.rotate(90) * 4
-        base_bottom = pygame.Vector2(self.x, self.y) + direction.rotate(-90) * 4
-        pygame.draw.polygon(surface, (255, 165, 0), [tip, base_top, base_bottom])
+        bird_surface = pygame.Surface((BIRD_RADIUS * 2 + 12, BIRD_RADIUS * 2 + 12), pygame.SRCALPHA)
+        center = (bird_surface.get_width() // 2, bird_surface.get_height() // 2)
+
+        body_color = (255, 225, 70)
+        belly_color = (255, 245, 180)
+        outline_color = (190, 145, 0)
+        wing_color = (255, 210, 60)
+        wing_outline = (180, 130, 0)
+
+        pygame.draw.circle(bird_surface, body_color, center, BIRD_RADIUS)
+        pygame.draw.circle(bird_surface, belly_color, (center[0] - 5, center[1] + 4), BIRD_RADIUS - 6)
+        pygame.draw.circle(bird_surface, outline_color, center, BIRD_RADIUS, 3)
+
+        wing_rect = pygame.Rect(0, 0, BIRD_RADIUS + 8, BIRD_RADIUS)
+        wing_rect.center = (center[0] - 4, center[1] + 2)
+        pygame.draw.ellipse(bird_surface, wing_color, wing_rect)
+        pygame.draw.ellipse(bird_surface, wing_outline, wing_rect, 2)
+
+        eye_white = (255, 255, 255)
+        eye_black = (0, 0, 0)
+        eye_center = (center[0] + 8, center[1] - 6)
+        pygame.draw.circle(bird_surface, eye_white, eye_center, 5)
+        pygame.draw.circle(bird_surface, eye_black, (eye_center[0] + 1, eye_center[1]), 2)
+
+        beak_color = (255, 170, 0)
+        beak_rect = pygame.Rect(0, 0, 16, 10)
+        beak_rect.center = (center[0] + BIRD_RADIUS - 4, center[1] + 2)
+        beak_points = [
+            (beak_rect.right, beak_rect.centery),
+            (beak_rect.left, beak_rect.top),
+            (beak_rect.left, beak_rect.bottom),
+        ]
+        pygame.draw.polygon(bird_surface, beak_color, beak_points)
+
+        rotated_bird = pygame.transform.rotozoom(bird_surface, -self.angle, 1)
+        rect = rotated_bird.get_rect(center=(int(self.x), int(self.y)))
+        surface.blit(rotated_bird, rect)
 
 
 @dataclass
@@ -93,12 +125,38 @@ class Pipe:
         return self.x + PIPE_WIDTH < 0
 
     def draw(self, surface: pygame.Surface) -> None:
-        color = (34, 139, 34)
-        pygame.draw.rect(surface, color, self.top_rect())
-        pygame.draw.rect(surface, color, self.bottom_rect())
-        # pipe edges
-        pygame.draw.rect(surface, (0, 100, 0), self.top_rect(), 4)
-        pygame.draw.rect(surface, (0, 100, 0), self.bottom_rect(), 4)
+        body_color = (76, 187, 23)
+        shade_color = (56, 145, 18)
+        highlight_color = (140, 227, 96)
+        rim_color = (96, 207, 43)
+        rim_height = 20
+
+        top_rect = self.top_rect()
+        bottom_rect = self.bottom_rect()
+
+        pygame.draw.rect(surface, body_color, top_rect)
+        pygame.draw.rect(surface, body_color, bottom_rect)
+
+        top_shade = pygame.Rect(top_rect.x + top_rect.width - 14, top_rect.y, 14, top_rect.height)
+        bottom_shade = pygame.Rect(bottom_rect.x + bottom_rect.width - 14, bottom_rect.y, 14, bottom_rect.height)
+        pygame.draw.rect(surface, shade_color, top_shade)
+        pygame.draw.rect(surface, shade_color, bottom_shade)
+
+        top_highlight = pygame.Rect(top_rect.x + 6, top_rect.y, 8, top_rect.height)
+        bottom_highlight = pygame.Rect(bottom_rect.x + 6, bottom_rect.y, 8, bottom_rect.height)
+        pygame.draw.rect(surface, highlight_color, top_highlight)
+        pygame.draw.rect(surface, highlight_color, bottom_highlight)
+
+        top_rim = pygame.Rect(top_rect.x - 6, top_rect.bottom - rim_height, PIPE_WIDTH + 12, rim_height)
+        bottom_rim = pygame.Rect(bottom_rect.x - 6, bottom_rect.y, PIPE_WIDTH + 12, rim_height)
+        pygame.draw.rect(surface, rim_color, top_rim)
+        pygame.draw.rect(surface, rim_color, bottom_rim)
+
+        pygame.draw.rect(surface, shade_color, top_rim, 3, border_radius=4)
+        pygame.draw.rect(surface, shade_color, bottom_rim, 3, border_radius=4)
+
+        pygame.draw.rect(surface, shade_color, top_rect, 3, border_radius=2)
+        pygame.draw.rect(surface, shade_color, bottom_rect, 3, border_radius=2)
 
 
 class Base:
@@ -160,12 +218,38 @@ def reset_game() -> Tuple[Bird, List[Pipe], int, Base]:
     return bird, pipes, score, base
 
 
+def load_sounds() -> Tuple[Optional[pygame.mixer.Sound], Optional[pygame.mixer.Sound]]:
+    jump_sound: Optional[pygame.mixer.Sound] = None
+    hit_sound: Optional[pygame.mixer.Sound] = None
+
+    try:
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        try:
+            jump_sound = pygame.mixer.Sound(os.path.join(base_path, "jump.wav"))
+        except (pygame.error, FileNotFoundError):
+            jump_sound = None
+        try:
+            hit_sound = pygame.mixer.Sound(os.path.join(base_path, "hit.wav"))
+        except (pygame.error, FileNotFoundError):
+            hit_sound = None
+    except pygame.error:
+        jump_sound = None
+        hit_sound = None
+
+    return jump_sound, hit_sound
+
+
 def main() -> None:
     os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Flappy Bird")
     clock = pygame.time.Clock()
+
+    global JUMP_SOUND, HIT_SOUND
+    JUMP_SOUND, HIT_SOUND = load_sounds()
 
     bird, pipes, score, base = reset_game()
     running = True
@@ -205,7 +289,9 @@ def main() -> None:
                     pipe.passed = True
                     score += 1
 
-            if check_collision(bird, pipes):
+            if bird.alive and check_collision(bird, pipes):
+                if HIT_SOUND:
+                    HIT_SOUND.play()
                 bird.alive = False
                 game_over = True
 
