@@ -7,6 +7,7 @@ Use the space bar or up arrow to flap the bird. Press escape to quit.
 """
 from __future__ import annotations
 
+import math
 import os
 import random
 import sys
@@ -65,39 +66,66 @@ class Bird:
         return pygame.Rect(int(self.x - BIRD_RADIUS), int(self.y - BIRD_RADIUS), BIRD_RADIUS * 2, BIRD_RADIUS * 2)
 
     def draw(self, surface: pygame.Surface) -> None:
-        bird_surface = pygame.Surface((BIRD_RADIUS * 2 + 12, BIRD_RADIUS * 2 + 12), pygame.SRCALPHA)
+        bird_surface = pygame.Surface((BIRD_RADIUS * 2 + 24, BIRD_RADIUS * 2 + 24), pygame.SRCALPHA)
         center = (bird_surface.get_width() // 2, bird_surface.get_height() // 2)
 
-        body_color = (255, 225, 70)
-        belly_color = (255, 245, 180)
-        outline_color = (190, 145, 0)
-        wing_color = (255, 210, 60)
-        wing_outline = (180, 130, 0)
+        body_color = (255, 230, 60)
+        body_shadow = (230, 200, 40)
+        belly_color = (255, 250, 210)
+        outline_color = (205, 150, 0)
+        wing_color = (255, 220, 80)
+        wing_shadow = (215, 170, 40)
 
-        pygame.draw.circle(bird_surface, body_color, center, BIRD_RADIUS)
-        pygame.draw.circle(bird_surface, belly_color, (center[0] - 5, center[1] + 4), BIRD_RADIUS - 6)
-        pygame.draw.circle(bird_surface, outline_color, center, BIRD_RADIUS, 3)
+        wing_time = pygame.time.get_ticks() / 220.0
+        idle_flap = 15 * math.sin(wing_time)
+        if not self.alive:
+            wing_angle = 18
+        elif self.velocity < -1.5:
+            wing_angle = -35
+        else:
+            wing_angle = idle_flap
 
-        wing_rect = pygame.Rect(0, 0, BIRD_RADIUS + 8, BIRD_RADIUS)
-        wing_rect.center = (center[0] - 4, center[1] + 2)
-        pygame.draw.ellipse(bird_surface, wing_color, wing_rect)
-        pygame.draw.ellipse(bird_surface, wing_outline, wing_rect, 2)
+        body_rect = pygame.Rect(0, 0, BIRD_RADIUS * 2 + 6, BIRD_RADIUS * 2 - 2)
+        body_rect.center = (center[0], center[1])
+        pygame.draw.ellipse(bird_surface, body_color, body_rect)
+        shade_rect = body_rect.inflate(-8, -6)
+        shade_rect.centerx -= 4
+        pygame.draw.ellipse(bird_surface, body_shadow, shade_rect, width=0)
+
+        belly_rect = pygame.Rect(0, 0, BIRD_RADIUS * 2 - 6, BIRD_RADIUS * 2 - 10)
+        belly_rect.center = (center[0] - 4, center[1] + 4)
+        pygame.draw.ellipse(bird_surface, belly_color, belly_rect)
+
+        pygame.draw.ellipse(bird_surface, outline_color, body_rect, 3)
+
+        wing_surface = pygame.Surface((BIRD_RADIUS + 16, BIRD_RADIUS), pygame.SRCALPHA)
+        wing_body = pygame.Rect(0, 0, wing_surface.get_width(), wing_surface.get_height())
+        pygame.draw.ellipse(wing_surface, wing_color, wing_body)
+        inner_wing = wing_body.inflate(-12, -10)
+        pygame.draw.ellipse(wing_surface, wing_shadow, inner_wing)
+        pygame.draw.ellipse(wing_surface, outline_color, wing_body, 2)
+        rotated_wing = pygame.transform.rotozoom(wing_surface, wing_angle, 1)
+        wing_pos = rotated_wing.get_rect(center=(center[0] - 8, center[1]))
+        bird_surface.blit(rotated_wing, wing_pos)
 
         eye_white = (255, 255, 255)
-        eye_black = (0, 0, 0)
-        eye_center = (center[0] + 8, center[1] - 6)
-        pygame.draw.circle(bird_surface, eye_white, eye_center, 5)
-        pygame.draw.circle(bird_surface, eye_black, (eye_center[0] + 1, eye_center[1]), 2)
+        eye_outline = (30, 30, 30)
+        eye_center = (center[0] + 10, center[1] - 6)
+        pygame.draw.circle(bird_surface, eye_white, eye_center, 6)
+        pygame.draw.circle(bird_surface, eye_outline, eye_center, 6, 2)
+        pygame.draw.circle(bird_surface, eye_outline, (eye_center[0] + 2, eye_center[1]), 3)
 
-        beak_color = (255, 170, 0)
-        beak_rect = pygame.Rect(0, 0, 16, 10)
-        beak_rect.center = (center[0] + BIRD_RADIUS - 4, center[1] + 2)
+        beak_color = (255, 170, 30)
+        beak_shadow = (220, 110, 0)
+        beak_rect = pygame.Rect(0, 0, 18, 12)
+        beak_rect.center = (center[0] + BIRD_RADIUS - 2, center[1] + 2)
         beak_points = [
             (beak_rect.right, beak_rect.centery),
-            (beak_rect.left, beak_rect.top),
-            (beak_rect.left, beak_rect.bottom),
+            (beak_rect.left, beak_rect.top + 2),
+            (beak_rect.left, beak_rect.bottom - 2),
         ]
         pygame.draw.polygon(bird_surface, beak_color, beak_points)
+        pygame.draw.polygon(bird_surface, beak_shadow, beak_points, 2)
 
         rotated_bird = pygame.transform.rotozoom(bird_surface, -self.angle, 1)
         rect = rotated_bird.get_rect(center=(int(self.x), int(self.y)))
