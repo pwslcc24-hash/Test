@@ -1,1 +1,0 @@
-print("GitHub connection successful.")
