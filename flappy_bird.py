@@ -26,7 +26,8 @@ BIRD_X = 80
 GRAVITY = 0.35
 FLAP_STRENGTH = -7.5
 BASE_HEIGHT = 80
-FONT_NAME = "freesansbold.ttf"
+# Use the default pygame font so the game works without bundled assets.
+FONT_NAME = None
 BACKGROUND_COLOR = (135, 206, 235)  # sky blue
 
 
