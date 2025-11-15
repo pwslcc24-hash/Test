@@ -183,6 +183,83 @@ class Base:
         pygame.draw.rect(surface, (139, 69, 19), pygame.Rect(0, self.y, WIDTH, 8))
 
 
+@dataclass
+class Cloud:
+    """Soft, layered cloud that scrolls slowly across the sky."""
+
+    x: float
+    y: float
+    base_radius: float
+    speed: float
+    offsets: List[Tuple[float, float, float]]
+
+    @property
+    def width(self) -> float:
+        return self.base_radius * 3.5
+
+    def update(self) -> None:
+        self.x -= self.speed
+        if self.x < -self.width:
+            self.x = WIDTH + random.uniform(20, 120)
+            self.y = random.uniform(40, 240)
+
+    def draw(self, surface: pygame.Surface) -> None:
+        cloud_surface_width = int(self.base_radius * 4)
+        cloud_surface_height = int(self.base_radius * 2.8)
+        cloud_surface = pygame.Surface((cloud_surface_width, cloud_surface_height), pygame.SRCALPHA)
+        center_x = cloud_surface_width // 2
+        center_y = cloud_surface_height // 2
+
+        for dx, dy, radius in self.offsets:
+            center = (int(center_x + dx), int(center_y + dy))
+            pygame.draw.circle(cloud_surface, (255, 255, 255, 190), center, int(radius))
+            pygame.draw.circle(
+                cloud_surface,
+                (255, 255, 255, 110),
+                (int(center_x + dx * 0.95), int(center_y + dy * 0.92)),
+                int(radius * 0.7),
+            )
+
+        surface.blit(
+            cloud_surface,
+            (int(self.x - cloud_surface_width / 2), int(self.y - cloud_surface_height / 2)),
+        )
+
+
+CLOUDS: List[Cloud] = []
+
+
+def create_cloud_offsets(base_radius: float) -> List[Tuple[float, float, float]]:
+    offsets: List[Tuple[float, float, float]] = []
+    template = (-1.2, -0.5, 0.0, 0.7, 1.3)
+    for index, factor in enumerate(template):
+        dx = factor * base_radius * 0.7 + random.uniform(-6, 6)
+        dy = random.uniform(-12, 12)
+        min_scale = 0.65 if index in (0, len(template) - 1) else 0.85
+        max_scale = 1.15 if index == 2 else 1.0
+        radius = base_radius * random.uniform(min_scale, max_scale)
+        offsets.append((dx, dy, radius))
+    offsets.append((random.uniform(-0.3, 0.4) * base_radius, -base_radius * 0.8, base_radius * 0.45))
+    return offsets
+
+
+def initialize_clouds() -> None:
+    if CLOUDS:
+        return
+    layers = (
+        (0.25, 56.0, 60),
+        (0.4, 48.0, 110),
+        (0.65, 36.0, 160),
+    )
+    for speed, base_radius, base_y in layers:
+        for _ in range(3):
+            radius = random.uniform(base_radius * 0.85, base_radius * 1.15)
+            x = random.uniform(0, WIDTH)
+            y = random.uniform(base_y - 20, base_y + 40)
+            offsets = create_cloud_offsets(radius)
+            CLOUDS.append(Cloud(x=x, y=y, base_radius=radius, speed=speed, offsets=offsets))
+
+
 def spawn_pipe() -> Pipe:
     margin = 70
     gap_center = random.randint(margin + PIPE_GAP // 2, HEIGHT - BASE_HEIGHT - margin - PIPE_GAP // 2)
@@ -254,6 +331,7 @@ def main() -> None:
     bird, pipes, score, base = reset_game()
     running = True
     game_over = False
+    high_score = 0
 
     while running:
         clock.tick(FPS)
@@ -294,6 +372,8 @@ def main() -> None:
                     HIT_SOUND.play()
                 bird.alive = False
                 game_over = True
+                if score > high_score:
+                    high_score = score
 
         # Drawing -----------------------------------------------------------------
         screen.fill(BACKGROUND_COLOR)
@@ -308,6 +388,7 @@ def main() -> None:
         bird.draw(screen)
 
         draw_text(screen, str(score), 48, (WIDTH // 2, 80))
+        draw_text(screen, f"HI {high_score}", 24, (WIDTH - 70, 40))
 
         if game_over:
             draw_text(screen, "Game Over", 48, (WIDTH // 2, HEIGHT // 2 - 40))
@@ -320,17 +401,11 @@ def main() -> None:
 
 
 def draw_clouds(surface: pygame.Surface) -> None:
-    cloud_color = (255, 255, 255)
-    cloud_positions = [
-        (50, 80, 60),
-        (200, 120, 75),
-        (320, 60, 55),
-        (120, 200, 70),
-    ]
-    for x, y, radius in cloud_positions:
-        pygame.draw.circle(surface, cloud_color, (x, y), radius)
-        pygame.draw.circle(surface, cloud_color, (x + radius // 2, y + 10), radius - 10)
-        pygame.draw.circle(surface, cloud_color, (x - radius // 2, y + 10), radius - 10)
+    if not CLOUDS:
+        initialize_clouds()
+    for cloud in CLOUDS:
+        cloud.update()
+        cloud.draw(surface)
 
 
 if __name__ == "__main__":
