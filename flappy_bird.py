@@ -21,7 +21,7 @@ FPS = 60
 PIPE_GAP = 160
 PIPE_WIDTH = 70
 PIPE_SPEED = 3
-BIRD_RADIUS = 18
+BIRD_RADIUS = 24
 BIRD_X = 80
 GRAVITY = 0.35
 FLAP_STRENGTH = -7.5
@@ -29,7 +29,7 @@ BASE_HEIGHT = 80
 FONT_NAME = "freesansbold.ttf"
 BACKGROUND_COLOR = (135, 206, 235)  # sky blue
 BIRD_ANIMATION_SPEED = 5
-CLOUD_SIZE_SCALE = 1.35
+CLOUD_SIZE_SCALE = 1.7
 
 
 JUMP_SOUND: Optional[pygame.mixer.Sound] = None
@@ -48,12 +48,12 @@ def create_smooth_bird_frames() -> List[pygame.Surface]:
     lip_color = (210, 40, 72)
     lip_highlight = (255, 110, 140)
 
-    width, height = 42, 32
-    body_rect = pygame.Rect(6, 8, 28, 18)
+    width, height = 52, 40
+    body_rect = pygame.Rect(6, 8, 35, 23)
     eye_center = (25, 16)
-    eye_radius = 7
-    pupil_radius = 4
-    lip_rect = pygame.Rect(28, 15, 10, 8)
+    eye_radius = 9
+    pupil_radius = 5
+    lip_rect = pygame.Rect(28, 15, 12, 10)
 
     wing_offsets = (-4, 0, 4)
     frames: List[pygame.Surface] = []
@@ -62,14 +62,14 @@ def create_smooth_bird_frames() -> List[pygame.Surface]:
         surface = pygame.Surface((width, height), pygame.SRCALPHA)
 
         pygame.draw.ellipse(surface, body_color, body_rect)
-        inner = body_rect.inflate(-10, -6).move(2, 2)
+        inner = body_rect.inflate(-12, -8).move(2, 2)
         pygame.draw.ellipse(surface, shadow_color, inner)
-        highlight = body_rect.inflate(-18, -10).move(-2, -3)
+        highlight = body_rect.inflate(-22, -12).move(-2, -3)
         pygame.draw.ellipse(surface, highlight_color, highlight)
         pygame.draw.ellipse(surface, outline_color, body_rect, 2)
 
-        wing_rect = pygame.Rect(10, 12 + offset, 12, 9)
-        pygame.draw.ellipse(surface, wing_shadow, wing_rect.inflate(2, 1))
+        wing_rect = pygame.Rect(10, 12 + offset, 15, 11)
+        pygame.draw.ellipse(surface, wing_shadow, wing_rect.inflate(3, 2))
         pygame.draw.ellipse(surface, wing_color, wing_rect)
         pygame.draw.ellipse(surface, outline_color, wing_rect, 1)
 
