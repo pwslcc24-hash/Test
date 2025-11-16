@@ -421,17 +421,33 @@ function roundRect(x, y, width, height, radius) {
 }
 
 function setupInput() {
+  const handleJump = (event) => {
+    if (event) {
+      event.preventDefault();
+    }
+    if (!gameOver) {
+      bird.flap();
+    } else {
+      resetGame();
+    }
+  };
+
   window.addEventListener("keydown", (event) => {
     if (event.code === "Space" || event.code === "ArrowUp") {
-      event.preventDefault();
-      if (!gameOver) {
-        bird.flap();
-      } else {
-        resetGame();
-      }
+      handleJump(event);
     } else if (event.code === "Escape") {
       resetGame();
     }
+  });
+
+  const clickTargets = [window, canvas];
+  clickTargets.forEach((target) => {
+    target.addEventListener("click", handleJump);
+    target.addEventListener(
+      "touchstart",
+      (event) => handleJump(event),
+      { passive: false }
+    );
   });
 }
 
