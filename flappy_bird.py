@@ -39,21 +39,19 @@ HIT_SOUND: Optional[pygame.mixer.Sound] = None
 def create_smooth_bird_frames() -> List[pygame.Surface]:
     """Create retro pixel-art bird frames while preserving wing animation timing."""
 
-    block = 2
-    grid_w, grid_h = 24, 20
-    width, height = grid_w * block, grid_h * block
+    width, height = 32, 32
 
     def rows_to_coords(rows: List[Tuple[int, int, int]]) -> set[Tuple[int, int]]:
         coords: set[Tuple[int, int]] = set()
-        for y, start, end in rows:
-            for x in range(start, end + 1):
+        for y, start_x, end_x in rows:
+            for x in range(start_x, end_x + 1):
                 coords.add((x, y))
         return coords
 
-    def draw_coords(surface: pygame.Surface, coords: set[Tuple[int, int]], color: Tuple[int, int, int], *, y_offset: int = 0) -> None:
+    def draw_coords(surface: pygame.Surface, coords: set[Tuple[int, int]], color: Tuple[int, int, int]) -> None:
         for x, y in coords:
-            rect = pygame.Rect(x * block, y * block + y_offset, block, block)
-            pygame.draw.rect(surface, color, rect)
+            if 0 <= x < width and 0 <= y < height:
+                surface.fill(color, pygame.Rect(x, y, 1, 1))
 
     def outline_for(coords: set[Tuple[int, int]]) -> set[Tuple[int, int]]:
         outline: set[Tuple[int, int]] = set()
@@ -62,82 +60,116 @@ def create_smooth_bird_frames() -> List[pygame.Surface]:
                 for dy in (-1, 0, 1):
                     if dx == 0 and dy == 0:
                         continue
-                    neighbor = (x + dx, y + dy)
-                    if 0 <= neighbor[0] < grid_w and 0 <= neighbor[1] < grid_h and neighbor not in coords:
-                        outline.add(neighbor)
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in coords:
+                        outline.add((nx, ny))
         return outline
 
-    body_rows = [
-        (5, 8, 16),
-        (6, 7, 17),
-        (7, 6, 18),
-        (8, 5, 18),
-        (9, 5, 18),
-        (10, 5, 18),
-        (11, 6, 18),
-        (12, 7, 17),
-        (13, 8, 16),
-    ]
-    beak_rows = [
-        (8, 19, 21),
-        (9, 19, 22),
-        (10, 19, 21),
-    ]
-    eye_rows = [
-        (7, 13, 16),
-        (8, 13, 17),
-        (9, 13, 17),
-        (10, 13, 16),
-    ]
-    pupil_rows = [
-        (8, 16, 16),
-        (9, 16, 16),
-    ]
-    wing_rows = [
-        (8, 2, 7),
-        (9, 1, 7),
-        (10, 2, 7),
-    ]
+    def translate(coords: set[Tuple[int, int]], *, dy: int = 0) -> set[Tuple[int, int]]:
+        return {(x, y + dy) for x, y in coords}
 
-    body_coords = rows_to_coords(body_rows)
-    beak_coords = rows_to_coords(beak_rows)
-    eye_coords = rows_to_coords(eye_rows)
-    pupil_coords = rows_to_coords(pupil_rows)
-    wing_coords = rows_to_coords(wing_rows)
-
-    silhouette = body_coords | beak_coords
-    silhouette_outline = outline_for(silhouette)
-    eye_outline = outline_for(eye_coords)
-    wing_outline = outline_for(wing_coords)
-
-    upper_body_color = (255, 224, 45)
+    upper_body_color = (255, 228, 61)
     lower_body_color = (238, 167, 32)
-    beak_color = (255, 140, 34)
+    beak_color = (255, 167, 17)
+    beak_shadow = (206, 117, 7)
     outline_color = (0, 0, 0)
     eye_white = (255, 255, 255)
     pupil_color = (0, 0, 0)
     wing_color = (245, 245, 245)
 
-    wing_offsets = (-4, 0, 4)
+    body_rows = [
+        (8, 6, 18),
+        (9, 5, 20),
+        (10, 4, 21),
+        (11, 4, 21),
+        (12, 3, 22),
+        (13, 3, 22),
+        (14, 3, 22),
+        (15, 3, 22),
+        (16, 3, 22),
+        (17, 4, 22),
+        (18, 4, 21),
+        (19, 5, 20),
+        (20, 6, 19),
+        (21, 7, 18),
+    ]
+
+    belly_rows = [
+        (15, 14, 21),
+        (16, 15, 22),
+        (17, 16, 22),
+        (18, 15, 21),
+        (19, 14, 20),
+        (20, 13, 18),
+    ]
+
+    upper_beak_rows = [
+        (14, 23, 27),
+        (15, 23, 27),
+    ]
+    lower_beak_rows = [
+        (17, 23, 27),
+        (18, 23, 27),
+    ]
+    beak_divider_rows = [
+        (16, 23, 27),
+    ]
+
+    eye_rows = [
+        (9, 16, 21),
+        (10, 16, 22),
+        (11, 16, 22),
+        (12, 16, 21),
+    ]
+    pupil_rows = [
+        (10, 20, 21),
+        (11, 20, 21),
+    ]
+
+    wing_rows = [
+        (14, 7, 11),
+        (15, 6, 12),
+        (16, 7, 11),
+    ]
+
+    body_coords = rows_to_coords(body_rows)
+    belly_coords = rows_to_coords(belly_rows)
+    upper_beak = rows_to_coords(upper_beak_rows)
+    lower_beak = rows_to_coords(lower_beak_rows)
+    beak_divider = rows_to_coords(beak_divider_rows)
+    eye_coords = rows_to_coords(eye_rows)
+    pupil_coords = rows_to_coords(pupil_rows)
+    wing_coords = rows_to_coords(wing_rows)
+
+    silhouette = body_coords | upper_beak | lower_beak
+    silhouette_outline = outline_for(silhouette)
+    eye_outline = outline_for(eye_coords)
+    wing_outline = outline_for(wing_coords)
+
+    upper_body = body_coords - belly_coords
+    lower_body = belly_coords
+
     frames: List[pygame.Surface] = []
+    wing_offsets = (-1, 1)
 
     for offset in wing_offsets:
         surface = pygame.Surface((width, height), pygame.SRCALPHA)
 
         draw_coords(surface, silhouette_outline, outline_color)
+        draw_coords(surface, upper_body, upper_body_color)
+        draw_coords(surface, lower_body, lower_body_color)
+        draw_coords(surface, upper_beak, beak_color)
+        draw_coords(surface, lower_beak, beak_color)
+        draw_coords(surface, beak_divider, beak_shadow)
 
-        upper_coords = {coord for coord in body_coords if coord[1] <= 9}
-        lower_coords = body_coords - upper_coords
-        draw_coords(surface, upper_coords, upper_body_color)
-        draw_coords(surface, lower_coords, lower_body_color)
-
-        draw_coords(surface, beak_coords, beak_color)
         draw_coords(surface, eye_outline, outline_color)
         draw_coords(surface, eye_coords, eye_white)
         draw_coords(surface, pupil_coords, pupil_color)
 
-        draw_coords(surface, wing_outline, outline_color, y_offset=offset)
-        draw_coords(surface, wing_coords, wing_color, y_offset=offset)
+        wing_outline_coords = translate(wing_outline, dy=offset)
+        wing_fill_coords = translate(wing_coords, dy=offset)
+        draw_coords(surface, wing_outline_coords, outline_color)
+        draw_coords(surface, wing_fill_coords, wing_color)
 
         frames.append(surface)
 
