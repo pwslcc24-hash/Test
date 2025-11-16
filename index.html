@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Flappy Bird (Canvas)</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: radial-gradient(circle at top, #cde9ff, #8ac0ff);
+        color: #0f172a;
+      }
+      main {
+        background: rgba(255, 255, 255, 0.85);
+        padding: 1.5rem;
+        border-radius: 1rem;
+        box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.25);
+        text-align: center;
+      }
+      canvas {
+        display: block;
+        border-radius: 0.75rem;
+        margin: 1rem auto;
+        image-rendering: pixelated;
+        box-shadow: inset 0 0 0 2px rgba(15, 23, 42, 0.2);
+      }
+      p {
+        margin: 0.25rem 0 0;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Flappy Bird</h1>
+      <canvas id="game" width="288" height="512" aria-label="Flappy Bird game board"></canvas>
+      <p>Press Space or ↑ to flap. Press Space after a crash to restart.</p>
+    </main>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>
