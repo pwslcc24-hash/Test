@@ -7,31 +7,51 @@ Use the space bar or up arrow to flap the bird. Press escape to quit.
 """
 from __future__ import annotations
 
+import math
 import os
 import random
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 import pygame
 
+pygame.init()
+screen = pygame.display.set_mode((288, 512))
+clock = pygame.time.Clock()
+
+BASE_PATH = os.path.dirname(__file__)
+up_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-upflap.png")).convert_alpha()
+mid_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-midflap.png")).convert_alpha()
+down_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-downflap.png")).convert_alpha()
+
+bird_frames = [mid_flap, down_flap, up_flap]
+bird_index = 0
+bird_surface = bird_frames[bird_index]
+bird_rect = bird_surface.get_rect(center=(100, 300))
+
 # Constants --------------------------------------------------------------------
-WIDTH, HEIGHT = 400, 600
+WIDTH, HEIGHT = 288, 512
 FPS = 60
 PIPE_GAP = 160
 PIPE_WIDTH = 70
 PIPE_SPEED = 3
-BIRD_RADIUS = 18
+BIRD_RADIUS = 24  # Will be updated once the bird frames are created.
 BIRD_X = 80
 GRAVITY = 0.35
 FLAP_STRENGTH = -7.5
 BASE_HEIGHT = 80
 FONT_NAME = "freesansbold.ttf"
 BACKGROUND_COLOR = (135, 206, 235)  # sky blue
+BIRD_FLAP_INTERVAL_MS = 120
+BIRD_FLAP_EVENT = pygame.USEREVENT + 1
+CLOUD_SIZE_SCALE = 1.7
 
 
 JUMP_SOUND: Optional[pygame.mixer.Sound] = None
 HIT_SOUND: Optional[pygame.mixer.Sound] = None
+
+BIRD_RADIUS = math.ceil(max(bird_surface.get_width(), bird_surface.get_height()) / 2)
 
 
 @dataclass
@@ -43,6 +63,11 @@ class Bird:
     velocity: float = 0.0
     angle: float = 0.0
     alive: bool = True
+    frame_index: int = 0
+    bird_rect: pygame.Rect = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.bird_rect = bird_surface.get_rect(center=(int(self.x), int(self.y)))
 
     def flap(self) -> None:
         if self.alive:
@@ -61,47 +86,24 @@ class Bird:
         else:
             self.angle = min(90, self.angle + 3)
 
+        self.bird_rect.center = (int(self.x), int(self.y))
+
+    def animate(self) -> None:
+        global bird_index, bird_surface
+        if not self.alive:
+            return
+        bird_index = (bird_index + 1) % len(bird_frames)
+        self.frame_index = bird_index
+        bird_surface = bird_frames[bird_index]
+
     def rect(self) -> pygame.Rect:
-        return pygame.Rect(int(self.x - BIRD_RADIUS), int(self.y - BIRD_RADIUS), BIRD_RADIUS * 2, BIRD_RADIUS * 2)
+        return self.bird_rect.copy()
 
     def draw(self, surface: pygame.Surface) -> None:
-        bird_surface = pygame.Surface((BIRD_RADIUS * 2 + 12, BIRD_RADIUS * 2 + 12), pygame.SRCALPHA)
-        center = (bird_surface.get_width() // 2, bird_surface.get_height() // 2)
-
-        body_color = (255, 225, 70)
-        belly_color = (255, 245, 180)
-        outline_color = (190, 145, 0)
-        wing_color = (255, 210, 60)
-        wing_outline = (180, 130, 0)
-
-        pygame.draw.circle(bird_surface, body_color, center, BIRD_RADIUS)
-        pygame.draw.circle(bird_surface, belly_color, (center[0] - 5, center[1] + 4), BIRD_RADIUS - 6)
-        pygame.draw.circle(bird_surface, outline_color, center, BIRD_RADIUS, 3)
-
-        wing_rect = pygame.Rect(0, 0, BIRD_RADIUS + 8, BIRD_RADIUS)
-        wing_rect.center = (center[0] - 4, center[1] + 2)
-        pygame.draw.ellipse(bird_surface, wing_color, wing_rect)
-        pygame.draw.ellipse(bird_surface, wing_outline, wing_rect, 2)
-
-        eye_white = (255, 255, 255)
-        eye_black = (0, 0, 0)
-        eye_center = (center[0] + 8, center[1] - 6)
-        pygame.draw.circle(bird_surface, eye_white, eye_center, 5)
-        pygame.draw.circle(bird_surface, eye_black, (eye_center[0] + 1, eye_center[1]), 2)
-
-        beak_color = (255, 170, 0)
-        beak_rect = pygame.Rect(0, 0, 16, 10)
-        beak_rect.center = (center[0] + BIRD_RADIUS - 4, center[1] + 2)
-        beak_points = [
-            (beak_rect.right, beak_rect.centery),
-            (beak_rect.left, beak_rect.top),
-            (beak_rect.left, beak_rect.bottom),
-        ]
-        pygame.draw.polygon(bird_surface, beak_color, beak_points)
-
-        rotated_bird = pygame.transform.rotozoom(bird_surface, -self.angle, 1)
-        rect = rotated_bird.get_rect(center=(int(self.x), int(self.y)))
-        surface.blit(rotated_bird, rect)
+        global bird_surface
+        bird_surface = bird_frames[self.frame_index]
+        self.bird_rect.center = (int(self.x), int(self.y))
+        surface.blit(bird_surface, self.bird_rect)
 
 
 @dataclass
@@ -191,11 +193,11 @@ class Cloud:
     y: float
     base_radius: float
     speed: float
-    offsets: List[Tuple[float, float, float]]
+    offsets: List[Tuple[float, float, float, float]]
 
     @property
     def width(self) -> float:
-        return self.base_radius * 3.5
+        return self.base_radius * 4.5
 
     def update(self) -> None:
         self.x -= self.speed
@@ -204,21 +206,22 @@ class Cloud:
             self.y = random.uniform(40, 240)
 
     def draw(self, surface: pygame.Surface) -> None:
-        cloud_surface_width = int(self.base_radius * 4)
-        cloud_surface_height = int(self.base_radius * 2.8)
+        cloud_surface_width = int(self.base_radius * 4.6)
+        cloud_surface_height = int(self.base_radius * 2.9)
         cloud_surface = pygame.Surface((cloud_surface_width, cloud_surface_height), pygame.SRCALPHA)
         center_x = cloud_surface_width // 2
         center_y = cloud_surface_height // 2
 
-        for dx, dy, radius in self.offsets:
-            center = (int(center_x + dx), int(center_y + dy))
-            pygame.draw.circle(cloud_surface, (255, 255, 255, 190), center, int(radius))
-            pygame.draw.circle(
-                cloud_surface,
-                (255, 255, 255, 110),
-                (int(center_x + dx * 0.95), int(center_y + dy * 0.92)),
-                int(radius * 0.7),
-            )
+        for index, (dx, dy, width, height) in enumerate(self.offsets):
+            rect = pygame.Rect(0, 0, int(width), int(height))
+            rect.center = (int(center_x + dx), int(center_y + dy))
+            alpha = max(180, 220 - index * 15)
+            main_color = (255, 255, 255, alpha)
+            accent_color = (255, 255, 255, max(170, alpha - 20))
+            pygame.draw.ellipse(cloud_surface, main_color, rect)
+            inner = rect.inflate(-rect.width * 0.25, -rect.height * 0.3)
+            if inner.width > 0 and inner.height > 0:
+                pygame.draw.ellipse(cloud_surface, accent_color, inner)
 
         surface.blit(
             cloud_surface,
@@ -229,17 +232,15 @@ class Cloud:
 CLOUDS: List[Cloud] = []
 
 
-def create_cloud_offsets(base_radius: float) -> List[Tuple[float, float, float]]:
-    offsets: List[Tuple[float, float, float]] = []
-    template = (-1.2, -0.5, 0.0, 0.7, 1.3)
-    for index, factor in enumerate(template):
-        dx = factor * base_radius * 0.7 + random.uniform(-6, 6)
-        dy = random.uniform(-12, 12)
-        min_scale = 0.65 if index in (0, len(template) - 1) else 0.85
-        max_scale = 1.15 if index == 2 else 1.0
-        radius = base_radius * random.uniform(min_scale, max_scale)
-        offsets.append((dx, dy, radius))
-    offsets.append((random.uniform(-0.3, 0.4) * base_radius, -base_radius * 0.8, base_radius * 0.45))
+def create_cloud_offsets(base_radius: float) -> List[Tuple[float, float, float, float]]:
+    offsets: List[Tuple[float, float, float, float]] = []
+    centers = (-0.75, 0.0, 0.75)
+    for index, factor in enumerate(centers):
+        dx = factor * base_radius + random.uniform(-8, 8)
+        dy = random.uniform(-8, 8)
+        width = base_radius * random.uniform(1.4, 1.8) if index == 1 else base_radius * random.uniform(1.1, 1.5)
+        height = base_radius * random.uniform(0.65, 0.9)
+        offsets.append((dx, dy, width, height))
     return offsets
 
 
@@ -253,7 +254,7 @@ def initialize_clouds() -> None:
     )
     for speed, base_radius, base_y in layers:
         for _ in range(3):
-            radius = random.uniform(base_radius * 0.85, base_radius * 1.15)
+            radius = random.uniform(base_radius * 0.85, base_radius * 1.15) * CLOUD_SIZE_SCALE
             x = random.uniform(0, WIDTH)
             y = random.uniform(base_y - 20, base_y + 40)
             offsets = create_cloud_offsets(radius)
@@ -288,6 +289,9 @@ def draw_text(surface: pygame.Surface, text: str, size: int, pos: Tuple[int, int
 
 
 def reset_game() -> Tuple[Bird, List[Pipe], int, Base]:
+    global bird_index, bird_surface
+    bird_index = 0
+    bird_surface = bird_frames[bird_index]
     bird = Bird(x=float(BIRD_X), y=HEIGHT / 2)
     pipes = [spawn_pipe()]
     score = 0
@@ -320,10 +324,8 @@ def load_sounds() -> Tuple[Optional[pygame.mixer.Sound], Optional[pygame.mixer.S
 
 def main() -> None:
     os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Flappy Bird")
-    clock = pygame.time.Clock()
+    pygame.time.set_timer(BIRD_FLAP_EVENT, BIRD_FLAP_INTERVAL_MS)
 
     global JUMP_SOUND, HIT_SOUND
     JUMP_SOUND, HIT_SOUND = load_sounds()
@@ -338,6 +340,8 @@ def main() -> None:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == BIRD_FLAP_EVENT:
+                bird.animate()
             elif event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_SPACE, pygame.K_UP):
                     if not game_over:
