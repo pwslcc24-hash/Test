@@ -37,77 +37,126 @@ HIT_SOUND: Optional[pygame.mixer.Sound] = None
 
 
 def create_pixel_bird_frames(scale: int = BIRD_SPRITE_SCALE) -> List[pygame.Surface]:
-    width, height = 16, 16
+    """Create crisp pixel-art bird frames."""
+
+    width, height = 18, 14
     palette = {
-        "y": (255, 220, 70),
-        "s": (230, 180, 40),
-        "o": (255, 244, 210),
-        "p": (255, 160, 54),
-        "d": (220, 110, 30),
-        "c": (255, 255, 255),
-        "k": (30, 30, 30),
-        "w": (255, 205, 110),
-        "g": (225, 170, 70),
-        "f": (240, 140, 50),
-        "h": (255, 235, 150),
+        "h": (255, 238, 164),  # highlight
+        "b": (253, 189, 70),  # main body
+        "s": (232, 141, 38),  # belly shadow
+        "t": (245, 212, 120),  # tail accent
+        "e": (255, 255, 255),  # eye white
+        "p": (22, 22, 22),  # pupil
+        "n": (255, 155, 60),  # beak
+        "o": (225, 110, 32),  # beak tip
+        "w": (255, 255, 255),  # wing
+        "u": (228, 228, 228),  # wing shadow
     }
-    wing_shape = [
-        (0, 0),
-        (1, 0),
-        (2, 0),
-        (3, 0),
-        (0, 1),
-        (1, 1),
-        (2, 1),
-        (3, 1),
-        (1, 2),
-        (2, 2),
+
+    base_map = [
+        "..................",
+        ".......hhhhh......",
+        ".....hhbbbbbh.....",
+        "...hhbbbbbbbbbb...",
+        "..hhbbbbbbbbbbbb..",
+        ".hhbbbbbbbbbbbbbb.",
+        ".hhbbbbbbbbbbbbbb.",
+        ".hhbbbbbbbbbbbbbb.",
+        ".hhbbbbbbbbbbbbbb.",
+        ".hhbbbbbbbbbbbbbb.",
+        "..hhbbbbbbbbbbbb..",
+        "...hhbbbbbbbbbb...",
+        ".....hhbbbbbbb....",
+        "..................",
     ]
+
+    base_grid = [list(row) for row in base_map]
+
+    for y in range(height):
+        for x in range(width):
+            if base_grid[y][x] == "b":
+                if y >= 9:
+                    base_grid[y][x] = "s"
+                elif x <= 2 and 4 <= y <= 9:
+                    base_grid[y][x] = "t"
+
+    eye_pixels = [
+        (11, 5),
+        (12, 5),
+        (11, 6),
+        (12, 6),
+        (13, 5),
+        (14, 5),
+        (13, 6),
+        (14, 6),
+    ]
+    for x, y in eye_pixels:
+        base_grid[y][x] = "e"
+
+    for x, y in ((12, 6), (14, 6)):
+        base_grid[y][x] = "p"
+
+    beak_pixels = [(15, 6), (15, 7), (16, 6), (16, 7)]
+    beak_tip = [(17, 6), (17, 7)]
+    for x, y in beak_pixels:
+        base_grid[y][x] = "n"
+    for x, y in beak_tip:
+        base_grid[y][x] = "o"
+
+    wing_anchor_x = 4
+    wing_anchor_y = 8
+    wing_frames = [
+        [
+            (-1, -3, "w"),
+            (0, -3, "w"),
+            (-2, -2, "w"),
+            (-1, -2, "w"),
+            (0, -2, "w"),
+            (1, -2, "w"),
+            (-2, -1, "w"),
+            (-1, -1, "w"),
+            (0, -1, "w"),
+            (1, -1, "w"),
+            (0, 0, "u"),
+        ],
+        [
+            (-2, -2, "w"),
+            (-1, -2, "w"),
+            (0, -2, "w"),
+            (1, -2, "w"),
+            (-2, -1, "w"),
+            (-1, -1, "w"),
+            (0, -1, "w"),
+            (1, -1, "w"),
+            (-1, 0, "w"),
+            (0, 0, "w"),
+            (1, 0, "w"),
+            (0, 1, "u"),
+        ],
+        [
+            (-1, -1, "w"),
+            (0, -1, "w"),
+            (1, -1, "w"),
+            (2, -1, "w"),
+            (-1, 0, "w"),
+            (0, 0, "w"),
+            (1, 0, "w"),
+            (2, 0, "w"),
+            (0, 1, "w"),
+            (1, 1, "w"),
+            (2, 1, "w"),
+            (1, 2, "u"),
+        ],
+    ]
+
     frames: List[pygame.Surface] = []
-    for wing_offset in (-2, 0, 2):
-        grid = [["." for _ in range(width)] for _ in range(height)]
-
-        body_center_x = 6.0
-        body_center_y = 7.5
-        radius_x = 4.7
-        radius_y = 4.0
-        for y in range(height):
-            for x in range(width - 1):
-                dx = (x - body_center_x) / radius_x
-                dy = (y - body_center_y) / radius_y
-                if dx * dx + dy * dy <= 1.0:
-                    if x <= body_center_x - 2:
-                        grid[y][x] = "o"
-                    elif x >= body_center_x + 2:
-                        grid[y][x] = "s"
-                    else:
-                        grid[y][x] = "y"
-
-        for x in range(5, 9):
-            grid[3][x] = "h"
-
-        grid[4][9] = "c"
-        grid[4][10] = "k"
-
-        for y in range(5, 8):
-            grid[y][12] = "p"
-            grid[y][13] = "p"
-        grid[6][14] = "d"
-        grid[6][15] = "d"
-        grid[7][14] = "d"
-
-        grid[12][4] = "f"
-        grid[12][5] = "f"
-        grid[13][3] = "f"
-        grid[13][4] = "f"
-
-        wing_base_x = 2
-        wing_base_y = 7 + wing_offset
-        for index, (dx, dy) in enumerate(wing_shape):
-            x = wing_base_x + dx
-            y = wing_base_y + dy
+    for wing_shape in wing_frames:
+        grid = [row[:] for row in base_grid]
+        for dx, dy, color_key in wing_shape:
+            x = wing_anchor_x + dx
+            y = wing_anchor_y + dy
             if 0 <= x < width and 0 <= y < height:
-                grid[y][x] = "w" if index < 6 else "g"
+                grid[y][x] = color_key
 
         surface = pygame.Surface((width * scale, height * scale), pygame.SRCALPHA)
         for y, row in enumerate(grid):
@@ -256,11 +305,11 @@ class Cloud:
     y: float
     base_radius: float
     speed: float
-    offsets: List[Tuple[float, float, float]]
+    offsets: List[Tuple[float, float, float, float]]
 
     @property
     def width(self) -> float:
-        return self.base_radius * 3.5
+        return self.base_radius * 4.5
 
     def update(self) -> None:
         self.x -= self.speed
@@ -269,21 +318,22 @@ class Cloud:
             self.y = random.uniform(40, 240)
 
     def draw(self, surface: pygame.Surface) -> None:
-        cloud_surface_width = int(self.base_radius * 4)
-        cloud_surface_height = int(self.base_radius * 2.8)
+        cloud_surface_width = int(self.base_radius * 4.6)
+        cloud_surface_height = int(self.base_radius * 2.9)
         cloud_surface = pygame.Surface((cloud_surface_width, cloud_surface_height), pygame.SRCALPHA)
         center_x = cloud_surface_width // 2
         center_y = cloud_surface_height // 2
 
-        for dx, dy, radius in self.offsets:
-            center = (int(center_x + dx), int(center_y + dy))
-            pygame.draw.circle(cloud_surface, (255, 255, 255, 190), center, int(radius))
-            pygame.draw.circle(
-                cloud_surface,
-                (255, 255, 255, 110),
-                (int(center_x + dx * 0.95), int(center_y + dy * 0.92)),
-                int(radius * 0.7),
-            )
+        for index, (dx, dy, width, height) in enumerate(self.offsets):
+            rect = pygame.Rect(0, 0, int(width), int(height))
+            rect.center = (int(center_x + dx), int(center_y + dy))
+            alpha = max(180, 220 - index * 15)
+            main_color = (255, 255, 255, alpha)
+            accent_color = (255, 255, 255, max(170, alpha - 20))
+            pygame.draw.ellipse(cloud_surface, main_color, rect)
+            inner = rect.inflate(-rect.width * 0.25, -rect.height * 0.3)
+            if inner.width > 0 and inner.height > 0:
+                pygame.draw.ellipse(cloud_surface, accent_color, inner)
 
         surface.blit(
             cloud_surface,
@@ -294,17 +344,15 @@ class Cloud:
 CLOUDS: List[Cloud] = []
 
 
-def create_cloud_offsets(base_radius: float) -> List[Tuple[float, float, float]]:
-    offsets: List[Tuple[float, float, float]] = []
-    template = (-1.2, -0.5, 0.0, 0.7, 1.3)
-    for index, factor in enumerate(template):
-        dx = factor * base_radius * 0.7 + random.uniform(-6, 6)
-        dy = random.uniform(-12, 12)
-        min_scale = 0.65 if index in (0, len(template) - 1) else 0.85
-        max_scale = 1.15 if index == 2 else 1.0
-        radius = base_radius * random.uniform(min_scale, max_scale)
-        offsets.append((dx, dy, radius))
-    offsets.append((random.uniform(-0.3, 0.4) * base_radius, -base_radius * 0.8, base_radius * 0.45))
+def create_cloud_offsets(base_radius: float) -> List[Tuple[float, float, float, float]]:
+    offsets: List[Tuple[float, float, float, float]] = []
+    centers = (-0.75, 0.0, 0.75)
+    for index, factor in enumerate(centers):
+        dx = factor * base_radius + random.uniform(-8, 8)
+        dy = random.uniform(-8, 8)
+        width = base_radius * random.uniform(1.4, 1.8) if index == 1 else base_radius * random.uniform(1.1, 1.5)
+        height = base_radius * random.uniform(0.65, 0.9)
+        offsets.append((dx, dy, width, height))
     return offsets
 
 
