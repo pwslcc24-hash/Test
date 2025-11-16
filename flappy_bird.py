@@ -37,23 +37,86 @@ HIT_SOUND: Optional[pygame.mixer.Sound] = None
 
 
 def create_smooth_bird_frames() -> List[pygame.Surface]:
-    """Create stylized Flappy Bird inspired frames with kissy lips and big wings."""
+    """Create retro pixel-art bird frames while preserving wing animation timing."""
 
-    body_color = (255, 228, 92)
-    shadow_color = (232, 172, 53)
-    highlight_color = (255, 248, 180)
-    outline_color = (216, 140, 32)
-    wing_color = (255, 255, 255)
-    wing_shadow = (230, 230, 230)
-    lip_color = (210, 40, 72)
-    lip_highlight = (255, 110, 140)
+    block = 2
+    grid_w, grid_h = 24, 20
+    width, height = grid_w * block, grid_h * block
 
-    width, height = 52, 40
-    body_rect = pygame.Rect(6, 8, 35, 23)
-    eye_center = (25, 16)
-    eye_radius = 9
-    pupil_radius = 5
-    lip_rect = pygame.Rect(28, 15, 12, 10)
+    def rows_to_coords(rows: List[Tuple[int, int, int]]) -> set[Tuple[int, int]]:
+        coords: set[Tuple[int, int]] = set()
+        for y, start, end in rows:
+            for x in range(start, end + 1):
+                coords.add((x, y))
+        return coords
+
+    def draw_coords(surface: pygame.Surface, coords: set[Tuple[int, int]], color: Tuple[int, int, int], *, y_offset: int = 0) -> None:
+        for x, y in coords:
+            rect = pygame.Rect(x * block, y * block + y_offset, block, block)
+            pygame.draw.rect(surface, color, rect)
+
+    def outline_for(coords: set[Tuple[int, int]]) -> set[Tuple[int, int]]:
+        outline: set[Tuple[int, int]] = set()
+        for x, y in coords:
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    if dx == 0 and dy == 0:
+                        continue
+                    neighbor = (x + dx, y + dy)
+                    if 0 <= neighbor[0] < grid_w and 0 <= neighbor[1] < grid_h and neighbor not in coords:
+                        outline.add(neighbor)
+        return outline
+
+    body_rows = [
+        (5, 8, 16),
+        (6, 7, 17),
+        (7, 6, 18),
+        (8, 5, 18),
+        (9, 5, 18),
+        (10, 5, 18),
+        (11, 6, 18),
+        (12, 7, 17),
+        (13, 8, 16),
+    ]
+    beak_rows = [
+        (8, 19, 21),
+        (9, 19, 22),
+        (10, 19, 21),
+    ]
+    eye_rows = [
+        (7, 13, 16),
+        (8, 13, 17),
+        (9, 13, 17),
+        (10, 13, 16),
+    ]
+    pupil_rows = [
+        (8, 16, 16),
+        (9, 16, 16),
+    ]
+    wing_rows = [
+        (8, 2, 7),
+        (9, 1, 7),
+        (10, 2, 7),
+    ]
+
+    body_coords = rows_to_coords(body_rows)
+    beak_coords = rows_to_coords(beak_rows)
+    eye_coords = rows_to_coords(eye_rows)
+    pupil_coords = rows_to_coords(pupil_rows)
+    wing_coords = rows_to_coords(wing_rows)
+
+    silhouette = body_coords | beak_coords
+    silhouette_outline = outline_for(silhouette)
+    eye_outline = outline_for(eye_coords)
+    wing_outline = outline_for(wing_coords)
+
+    upper_body_color = (255, 224, 45)
+    lower_body_color = (238, 167, 32)
+    beak_color = (255, 140, 34)
+    outline_color = (0, 0, 0)
+    eye_white = (255, 255, 255)
+    pupil_color = (0, 0, 0)
+    wing_color = (245, 245, 245)
 
     wing_offsets = (-4, 0, 4)
     frames: List[pygame.Surface] = []
@@ -61,26 +124,20 @@ def create_smooth_bird_frames() -> List[pygame.Surface]:
     for offset in wing_offsets:
         surface = pygame.Surface((width, height), pygame.SRCALPHA)
 
-        pygame.draw.ellipse(surface, body_color, body_rect)
-        inner = body_rect.inflate(-12, -8).move(2, 2)
-        pygame.draw.ellipse(surface, shadow_color, inner)
-        highlight = body_rect.inflate(-22, -12).move(-2, -3)
-        pygame.draw.ellipse(surface, highlight_color, highlight)
-        pygame.draw.ellipse(surface, outline_color, body_rect, 2)
+        draw_coords(surface, silhouette_outline, outline_color)
 
-        wing_rect = pygame.Rect(10, 12 + offset, 15, 11)
-        pygame.draw.ellipse(surface, wing_shadow, wing_rect.inflate(3, 2))
-        pygame.draw.ellipse(surface, wing_color, wing_rect)
-        pygame.draw.ellipse(surface, outline_color, wing_rect, 1)
+        upper_coords = {coord for coord in body_coords if coord[1] <= 9}
+        lower_coords = body_coords - upper_coords
+        draw_coords(surface, upper_coords, upper_body_color)
+        draw_coords(surface, lower_coords, lower_body_color)
 
-        pygame.draw.circle(surface, (255, 255, 255), eye_center, eye_radius)
-        pygame.draw.circle(surface, (0, 0, 0), eye_center, pupil_radius)
-        pygame.draw.circle(surface, highlight_color, (eye_center[0] - 2, eye_center[1] - 2), 2)
+        draw_coords(surface, beak_coords, beak_color)
+        draw_coords(surface, eye_outline, outline_color)
+        draw_coords(surface, eye_coords, eye_white)
+        draw_coords(surface, pupil_coords, pupil_color)
 
-        pygame.draw.ellipse(surface, lip_color, lip_rect)
-        inner_lip = lip_rect.inflate(-4, -3).move(1, 0)
-        pygame.draw.ellipse(surface, lip_highlight, inner_lip)
-        pygame.draw.ellipse(surface, outline_color, lip_rect, 1)
+        draw_coords(surface, wing_outline, outline_color, y_offset=offset)
+        draw_coords(surface, wing_coords, wing_color, y_offset=offset)
 
         frames.append(surface)
 
