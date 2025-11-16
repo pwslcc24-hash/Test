@@ -11,7 +11,7 @@ import math
 import os
 import random
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
 import pygame
@@ -23,190 +23,29 @@ PIPE_GAP = 160
 PIPE_WIDTH = 70
 PIPE_SPEED = 3
 BIRD_RADIUS = 24  # Will be updated once the bird frames are created.
-BIRD_SCALE = 1.35
 BIRD_X = 80
 GRAVITY = 0.35
 FLAP_STRENGTH = -7.5
 BASE_HEIGHT = 80
 FONT_NAME = "freesansbold.ttf"
 BACKGROUND_COLOR = (135, 206, 235)  # sky blue
-BIRD_ANIMATION_SPEED = 5
+BIRD_FLAP_INTERVAL_MS = 120
+BIRD_FLAP_EVENT = pygame.USEREVENT + 1
 CLOUD_SIZE_SCALE = 1.7
 
 
 JUMP_SOUND: Optional[pygame.mixer.Sound] = None
 HIT_SOUND: Optional[pygame.mixer.Sound] = None
 
+BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+up_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-upflap.png")).convert_alpha()
+mid_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-midflap.png")).convert_alpha()
+down_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-downflap.png")).convert_alpha()
 
-def create_smooth_bird_frames() -> List[pygame.Surface]:
-    """Create retro pixel-art bird frames while preserving wing animation timing."""
-
-    width, height = 32, 32
-
-    def rows_to_coords(rows: List[Tuple[int, int, int]]) -> set[Tuple[int, int]]:
-        coords: set[Tuple[int, int]] = set()
-        for y, start_x, end_x in rows:
-            for x in range(start_x, end_x + 1):
-                coords.add((x, y))
-        return coords
-
-    def draw_coords(surface: pygame.Surface, coords: set[Tuple[int, int]], color: Tuple[int, int, int]) -> None:
-        for x, y in coords:
-            if 0 <= x < width and 0 <= y < height:
-                surface.fill(color, pygame.Rect(x, y, 1, 1))
-
-    def outline_for(coords: set[Tuple[int, int]]) -> set[Tuple[int, int]]:
-        outline: set[Tuple[int, int]] = set()
-        for x, y in coords:
-            for dx in (-1, 0, 1):
-                for dy in (-1, 0, 1):
-                    if dx == 0 and dy == 0:
-                        continue
-                    nx, ny = x + dx, y + dy
-                    if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in coords:
-                        outline.add((nx, ny))
-        return outline
-
-    def translate(coords: set[Tuple[int, int]], *, dy: int = 0) -> set[Tuple[int, int]]:
-        return {(x, y + dy) for x, y in coords}
-
-    upper_body_color = (255, 228, 61)
-    lower_body_color = (238, 167, 32)
-    beak_color = (255, 167, 17)
-    beak_shadow = (206, 117, 7)
-    outline_color = (0, 0, 0)
-    eye_white = (255, 255, 255)
-    pupil_color = (0, 0, 0)
-    wing_color = (250, 250, 250)
-    wing_shadow = (229, 229, 229)
-
-    body_rows = [
-        (8, 6, 18),
-        (9, 5, 19),
-        (10, 4, 20),
-        (11, 3, 21),
-        (12, 3, 21),
-        (13, 2, 22),
-        (14, 2, 22),
-        (15, 3, 22),
-        (16, 3, 22),
-        (17, 4, 21),
-        (18, 4, 21),
-        (19, 5, 20),
-        (20, 6, 19),
-        (21, 7, 18),
-        (22, 8, 17),
-    ]
-
-    belly_rows = [
-        (15, 14, 21),
-        (16, 15, 22),
-        (17, 16, 22),
-        (18, 16, 21),
-        (19, 15, 20),
-        (20, 14, 19),
-    ]
-
-    upper_beak_rows = [
-        (10, 22, 27),
-        (11, 22, 27),
-    ]
-    lower_beak_rows = [
-        (13, 22, 27),
-        (14, 22, 27),
-    ]
-    beak_divider_rows = [
-        (12, 22, 27),
-    ]
-
-    eye_rows = [
-        (9, 15, 21),
-        (10, 15, 22),
-        (11, 15, 22),
-        (12, 15, 21),
-        (13, 15, 20),
-    ]
-    pupil_rows = [
-        (10, 20, 21),
-        (11, 20, 21),
-    ]
-
-    wing_rows = [
-        (12, 4, 12),
-        (13, 3, 13),
-        (14, 3, 14),
-        (15, 4, 14),
-        (16, 5, 13),
-        (17, 6, 12),
-    ]
-
-    wing_inner_rows = [
-        (13, 6, 10),
-        (14, 6, 11),
-        (15, 7, 12),
-        (16, 7, 11),
-    ]
-
-    body_coords = rows_to_coords(body_rows)
-    belly_coords = rows_to_coords(belly_rows)
-    upper_beak = rows_to_coords(upper_beak_rows)
-    lower_beak = rows_to_coords(lower_beak_rows)
-    beak_divider = rows_to_coords(beak_divider_rows)
-    eye_coords = rows_to_coords(eye_rows)
-    pupil_coords = rows_to_coords(pupil_rows)
-    wing_coords = rows_to_coords(wing_rows)
-    wing_inner_coords = rows_to_coords(wing_inner_rows)
-
-    silhouette = body_coords | upper_beak | lower_beak
-    silhouette_outline = outline_for(silhouette)
-    eye_outline = outline_for(eye_coords)
-    wing_outline = outline_for(wing_coords)
-
-    upper_body = body_coords - belly_coords
-    lower_body = belly_coords
-
-    frames: List[pygame.Surface] = []
-    wing_offsets = (-3, 3)
-
-    for offset in wing_offsets:
-        surface = pygame.Surface((width, height), pygame.SRCALPHA)
-
-        draw_coords(surface, silhouette_outline, outline_color)
-        draw_coords(surface, upper_body, upper_body_color)
-        draw_coords(surface, lower_body, lower_body_color)
-        draw_coords(surface, upper_beak, beak_color)
-        draw_coords(surface, lower_beak, beak_color)
-        draw_coords(surface, beak_divider, beak_shadow)
-
-        draw_coords(surface, eye_outline, outline_color)
-        draw_coords(surface, eye_coords, eye_white)
-        draw_coords(surface, pupil_coords, pupil_color)
-
-        wing_outline_coords = translate(wing_outline, dy=offset)
-        wing_fill_coords = translate(wing_coords, dy=offset)
-        wing_inner = translate(wing_inner_coords, dy=offset)
-        draw_coords(surface, wing_outline_coords, outline_color)
-        draw_coords(surface, wing_fill_coords, wing_color)
-        draw_coords(surface, wing_inner, wing_shadow)
-
-        if BIRD_SCALE != 1.0:
-            scaled_surface = pygame.transform.smoothscale(
-                surface,
-                (
-                    int(surface.get_width() * BIRD_SCALE),
-                    int(surface.get_height() * BIRD_SCALE),
-                ),
-            )
-        else:
-            scaled_surface = surface
-
-        frames.append(scaled_surface)
-
-    return frames
-
-
-BIRD_FRAMES = create_smooth_bird_frames()
-BIRD_RADIUS = math.ceil(max(BIRD_FRAMES[0].get_width(), BIRD_FRAMES[0].get_height()) / 2)
+BIRD_FRAMES = [up_flap, mid_flap, down_flap]
+bird_index = 0
+bird_surface = BIRD_FRAMES[bird_index]
+BIRD_RADIUS = math.ceil(max(bird_surface.get_width(), bird_surface.get_height()) / 2)
 
 
 @dataclass
@@ -219,7 +58,10 @@ class Bird:
     angle: float = 0.0
     alive: bool = True
     frame_index: int = 0
-    frame_counter: int = 0
+    bird_rect: pygame.Rect = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.bird_rect = bird_surface.get_rect(center=(int(self.x), int(self.y)))
 
     def flap(self) -> None:
         if self.alive:
@@ -238,20 +80,24 @@ class Bird:
         else:
             self.angle = min(90, self.angle + 3)
 
-        if self.alive:
-            self.frame_counter += 1
-            if self.frame_counter >= BIRD_ANIMATION_SPEED:
-                self.frame_counter = 0
-                self.frame_index = (self.frame_index + 1) % len(BIRD_FRAMES)
+        self.bird_rect.center = (int(self.x), int(self.y))
+
+    def animate(self) -> None:
+        global bird_index, bird_surface
+        if not self.alive:
+            return
+        bird_index = (bird_index + 1) % len(BIRD_FRAMES)
+        self.frame_index = bird_index
+        bird_surface = BIRD_FRAMES[bird_index]
 
     def rect(self) -> pygame.Rect:
-        return pygame.Rect(int(self.x - BIRD_RADIUS), int(self.y - BIRD_RADIUS), BIRD_RADIUS * 2, BIRD_RADIUS * 2)
+        return self.bird_rect.copy()
 
     def draw(self, surface: pygame.Surface) -> None:
-        current_frame = BIRD_FRAMES[self.frame_index]
-        rotated_bird = pygame.transform.rotozoom(current_frame, -self.angle, 1)
-        rect = rotated_bird.get_rect(center=(int(self.x), int(self.y)))
-        surface.blit(rotated_bird, rect)
+        global bird_surface
+        bird_surface = BIRD_FRAMES[self.frame_index]
+        self.bird_rect.center = (int(self.x), int(self.y))
+        surface.blit(bird_surface, self.bird_rect)
 
 
 @dataclass
@@ -437,6 +283,9 @@ def draw_text(surface: pygame.Surface, text: str, size: int, pos: Tuple[int, int
 
 
 def reset_game() -> Tuple[Bird, List[Pipe], int, Base]:
+    global bird_index, bird_surface
+    bird_index = 0
+    bird_surface = BIRD_FRAMES[bird_index]
     bird = Bird(x=float(BIRD_X), y=HEIGHT / 2)
     pipes = [spawn_pipe()]
     score = 0
@@ -473,6 +322,7 @@ def main() -> None:
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Flappy Bird")
     clock = pygame.time.Clock()
+    pygame.time.set_timer(BIRD_FLAP_EVENT, BIRD_FLAP_INTERVAL_MS)
 
     global JUMP_SOUND, HIT_SOUND
     JUMP_SOUND, HIT_SOUND = load_sounds()
@@ -487,6 +337,8 @@ def main() -> None:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == BIRD_FLAP_EVENT:
+                bird.animate()
             elif event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_SPACE, pygame.K_UP):
                     if not game_over:
