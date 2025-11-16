@@ -29,148 +29,65 @@ BASE_HEIGHT = 80
 FONT_NAME = "freesansbold.ttf"
 BACKGROUND_COLOR = (135, 206, 235)  # sky blue
 BIRD_ANIMATION_SPEED = 5
-BIRD_SPRITE_SCALE = 3
+CLOUD_SIZE_SCALE = 1.35
 
 
 JUMP_SOUND: Optional[pygame.mixer.Sound] = None
 HIT_SOUND: Optional[pygame.mixer.Sound] = None
 
 
-def create_pixel_bird_frames(scale: int = BIRD_SPRITE_SCALE) -> List[pygame.Surface]:
-    """Create crisp pixel-art bird frames."""
+def create_smooth_bird_frames() -> List[pygame.Surface]:
+    """Create stylized Flappy Bird inspired frames with kissy lips and big wings."""
 
-    width, height = 18, 14
-    palette = {
-        "h": (255, 238, 164),  # highlight
-        "b": (253, 189, 70),  # main body
-        "s": (232, 141, 38),  # belly shadow
-        "t": (245, 212, 120),  # tail accent
-        "e": (255, 255, 255),  # eye white
-        "p": (22, 22, 22),  # pupil
-        "n": (255, 155, 60),  # beak
-        "o": (225, 110, 32),  # beak tip
-        "w": (255, 255, 255),  # wing
-        "u": (228, 228, 228),  # wing shadow
-    }
+    body_color = (255, 228, 92)
+    shadow_color = (232, 172, 53)
+    highlight_color = (255, 248, 180)
+    outline_color = (216, 140, 32)
+    wing_color = (255, 255, 255)
+    wing_shadow = (230, 230, 230)
+    lip_color = (210, 40, 72)
+    lip_highlight = (255, 110, 140)
 
-    base_map = [
-        "..................",
-        ".......hhhhh......",
-        ".....hhbbbbbh.....",
-        "...hhbbbbbbbbbb...",
-        "..hhbbbbbbbbbbbb..",
-        ".hhbbbbbbbbbbbbbb.",
-        ".hhbbbbbbbbbbbbbb.",
-        ".hhbbbbbbbbbbbbbb.",
-        ".hhbbbbbbbbbbbbbb.",
-        ".hhbbbbbbbbbbbbbb.",
-        "..hhbbbbbbbbbbbb..",
-        "...hhbbbbbbbbbb...",
-        ".....hhbbbbbbb....",
-        "..................",
-    ]
+    width, height = 42, 32
+    body_rect = pygame.Rect(6, 8, 28, 18)
+    eye_center = (25, 16)
+    eye_radius = 7
+    pupil_radius = 4
+    lip_rect = pygame.Rect(28, 15, 10, 8)
 
-    base_grid = [list(row) for row in base_map]
-
-    for y in range(height):
-        for x in range(width):
-            if base_grid[y][x] == "b":
-                if y >= 9:
-                    base_grid[y][x] = "s"
-                elif x <= 2 and 4 <= y <= 9:
-                    base_grid[y][x] = "t"
-
-    eye_pixels = [
-        (11, 5),
-        (12, 5),
-        (11, 6),
-        (12, 6),
-        (13, 5),
-        (14, 5),
-        (13, 6),
-        (14, 6),
-    ]
-    for x, y in eye_pixels:
-        base_grid[y][x] = "e"
-
-    for x, y in ((12, 6), (14, 6)):
-        base_grid[y][x] = "p"
-
-    beak_pixels = [(15, 6), (15, 7), (16, 6), (16, 7)]
-    beak_tip = [(17, 6), (17, 7)]
-    for x, y in beak_pixels:
-        base_grid[y][x] = "n"
-    for x, y in beak_tip:
-        base_grid[y][x] = "o"
-
-    wing_anchor_x = 4
-    wing_anchor_y = 8
-    wing_frames = [
-        [
-            (-1, -3, "w"),
-            (0, -3, "w"),
-            (-2, -2, "w"),
-            (-1, -2, "w"),
-            (0, -2, "w"),
-            (1, -2, "w"),
-            (-2, -1, "w"),
-            (-1, -1, "w"),
-            (0, -1, "w"),
-            (1, -1, "w"),
-            (0, 0, "u"),
-        ],
-        [
-            (-2, -2, "w"),
-            (-1, -2, "w"),
-            (0, -2, "w"),
-            (1, -2, "w"),
-            (-2, -1, "w"),
-            (-1, -1, "w"),
-            (0, -1, "w"),
-            (1, -1, "w"),
-            (-1, 0, "w"),
-            (0, 0, "w"),
-            (1, 0, "w"),
-            (0, 1, "u"),
-        ],
-        [
-            (-1, -1, "w"),
-            (0, -1, "w"),
-            (1, -1, "w"),
-            (2, -1, "w"),
-            (-1, 0, "w"),
-            (0, 0, "w"),
-            (1, 0, "w"),
-            (2, 0, "w"),
-            (0, 1, "w"),
-            (1, 1, "w"),
-            (2, 1, "w"),
-            (1, 2, "u"),
-        ],
-    ]
-
+    wing_offsets = (-4, 0, 4)
     frames: List[pygame.Surface] = []
-    for wing_shape in wing_frames:
-        grid = [row[:] for row in base_grid]
-        for dx, dy, color_key in wing_shape:
-            x = wing_anchor_x + dx
-            y = wing_anchor_y + dy
-            if 0 <= x < width and 0 <= y < height:
-                grid[y][x] = color_key
 
-        surface = pygame.Surface((width * scale, height * scale), pygame.SRCALPHA)
-        for y, row in enumerate(grid):
-            for x, cell in enumerate(row):
-                color = palette.get(cell)
-                if color:
-                    rect = pygame.Rect(x * scale, y * scale, scale, scale)
-                    surface.fill(color, rect)
+    for offset in wing_offsets:
+        surface = pygame.Surface((width, height), pygame.SRCALPHA)
+
+        pygame.draw.ellipse(surface, body_color, body_rect)
+        inner = body_rect.inflate(-10, -6).move(2, 2)
+        pygame.draw.ellipse(surface, shadow_color, inner)
+        highlight = body_rect.inflate(-18, -10).move(-2, -3)
+        pygame.draw.ellipse(surface, highlight_color, highlight)
+        pygame.draw.ellipse(surface, outline_color, body_rect, 2)
+
+        wing_rect = pygame.Rect(10, 12 + offset, 12, 9)
+        pygame.draw.ellipse(surface, wing_shadow, wing_rect.inflate(2, 1))
+        pygame.draw.ellipse(surface, wing_color, wing_rect)
+        pygame.draw.ellipse(surface, outline_color, wing_rect, 1)
+
+        pygame.draw.circle(surface, (255, 255, 255), eye_center, eye_radius)
+        pygame.draw.circle(surface, (0, 0, 0), eye_center, pupil_radius)
+        pygame.draw.circle(surface, highlight_color, (eye_center[0] - 2, eye_center[1] - 2), 2)
+
+        pygame.draw.ellipse(surface, lip_color, lip_rect)
+        inner_lip = lip_rect.inflate(-4, -3).move(1, 0)
+        pygame.draw.ellipse(surface, lip_highlight, inner_lip)
+        pygame.draw.ellipse(surface, outline_color, lip_rect, 1)
+
         frames.append(surface)
 
     return frames
 
 
-BIRD_FRAMES = create_pixel_bird_frames()
+BIRD_FRAMES = create_smooth_bird_frames()
 
 
 @dataclass
@@ -366,7 +283,7 @@ def initialize_clouds() -> None:
     )
     for speed, base_radius, base_y in layers:
         for _ in range(3):
-            radius = random.uniform(base_radius * 0.85, base_radius * 1.15)
+            radius = random.uniform(base_radius * 0.85, base_radius * 1.15) * CLOUD_SIZE_SCALE
             x = random.uniform(0, WIDTH)
             y = random.uniform(base_y - 20, base_y + 40)
             offsets = create_cloud_offsets(radius)
