@@ -16,8 +16,22 @@ from typing import List, Optional, Tuple
 
 import pygame
 
+pygame.init()
+screen = pygame.display.set_mode((288, 512))
+clock = pygame.time.Clock()
+
+BASE_PATH = os.path.dirname(__file__)
+up_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-upflap.png")).convert_alpha()
+mid_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-midflap.png")).convert_alpha()
+down_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-downflap.png")).convert_alpha()
+
+bird_frames = [mid_flap, down_flap, up_flap]
+bird_index = 0
+bird_surface = bird_frames[bird_index]
+bird_rect = bird_surface.get_rect(center=(100, 300))
+
 # Constants --------------------------------------------------------------------
-WIDTH, HEIGHT = 400, 600
+WIDTH, HEIGHT = 288, 512
 FPS = 60
 PIPE_GAP = 160
 PIPE_WIDTH = 70
@@ -37,14 +51,6 @@ CLOUD_SIZE_SCALE = 1.7
 JUMP_SOUND: Optional[pygame.mixer.Sound] = None
 HIT_SOUND: Optional[pygame.mixer.Sound] = None
 
-BASE_PATH = os.path.dirname(os.path.abspath(__file__))
-up_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-upflap.png")).convert_alpha()
-mid_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-midflap.png")).convert_alpha()
-down_flap = pygame.image.load(os.path.join(BASE_PATH, "yellowbird-downflap.png")).convert_alpha()
-
-BIRD_FRAMES = [up_flap, mid_flap, down_flap]
-bird_index = 0
-bird_surface = BIRD_FRAMES[bird_index]
 BIRD_RADIUS = math.ceil(max(bird_surface.get_width(), bird_surface.get_height()) / 2)
 
 
@@ -86,16 +92,16 @@ class Bird:
         global bird_index, bird_surface
         if not self.alive:
             return
-        bird_index = (bird_index + 1) % len(BIRD_FRAMES)
+        bird_index = (bird_index + 1) % len(bird_frames)
         self.frame_index = bird_index
-        bird_surface = BIRD_FRAMES[bird_index]
+        bird_surface = bird_frames[bird_index]
 
     def rect(self) -> pygame.Rect:
         return self.bird_rect.copy()
 
     def draw(self, surface: pygame.Surface) -> None:
         global bird_surface
-        bird_surface = BIRD_FRAMES[self.frame_index]
+        bird_surface = bird_frames[self.frame_index]
         self.bird_rect.center = (int(self.x), int(self.y))
         surface.blit(bird_surface, self.bird_rect)
 
@@ -285,7 +291,7 @@ def draw_text(surface: pygame.Surface, text: str, size: int, pos: Tuple[int, int
 def reset_game() -> Tuple[Bird, List[Pipe], int, Base]:
     global bird_index, bird_surface
     bird_index = 0
-    bird_surface = BIRD_FRAMES[bird_index]
+    bird_surface = bird_frames[bird_index]
     bird = Bird(x=float(BIRD_X), y=HEIGHT / 2)
     pipes = [spawn_pipe()]
     score = 0
@@ -318,10 +324,7 @@ def load_sounds() -> Tuple[Optional[pygame.mixer.Sound], Optional[pygame.mixer.S
 
 def main() -> None:
     os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
-    pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Flappy Bird")
-    clock = pygame.time.Clock()
     pygame.time.set_timer(BIRD_FLAP_EVENT, BIRD_FLAP_INTERVAL_MS)
 
     global JUMP_SOUND, HIT_SOUND
