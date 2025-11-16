@@ -7,6 +7,7 @@ Use the space bar or up arrow to flap the bird. Press escape to quit.
 """
 from __future__ import annotations
 
+import math
 import os
 import random
 import sys
@@ -21,7 +22,8 @@ FPS = 60
 PIPE_GAP = 160
 PIPE_WIDTH = 70
 PIPE_SPEED = 3
-BIRD_RADIUS = 24
+BIRD_RADIUS = 24  # Will be updated once the bird frames are created.
+BIRD_SCALE = 1.35
 BIRD_X = 80
 GRAVITY = 0.35
 FLAP_STRENGTH = -7.5
@@ -75,7 +77,8 @@ def create_smooth_bird_frames() -> List[pygame.Surface]:
     outline_color = (0, 0, 0)
     eye_white = (255, 255, 255)
     pupil_color = (0, 0, 0)
-    wing_color = (245, 245, 245)
+    wing_color = (250, 250, 250)
+    wing_shadow = (229, 229, 229)
 
     body_rows = [
         (8, 6, 18),
@@ -129,9 +132,19 @@ def create_smooth_bird_frames() -> List[pygame.Surface]:
     ]
 
     wing_rows = [
-        (14, 6, 10),
-        (15, 5, 11),
-        (16, 6, 10),
+        (12, 4, 12),
+        (13, 3, 13),
+        (14, 3, 14),
+        (15, 4, 14),
+        (16, 5, 13),
+        (17, 6, 12),
+    ]
+
+    wing_inner_rows = [
+        (13, 6, 10),
+        (14, 6, 11),
+        (15, 7, 12),
+        (16, 7, 11),
     ]
 
     body_coords = rows_to_coords(body_rows)
@@ -142,6 +155,7 @@ def create_smooth_bird_frames() -> List[pygame.Surface]:
     eye_coords = rows_to_coords(eye_rows)
     pupil_coords = rows_to_coords(pupil_rows)
     wing_coords = rows_to_coords(wing_rows)
+    wing_inner_coords = rows_to_coords(wing_inner_rows)
 
     silhouette = body_coords | upper_beak | lower_beak
     silhouette_outline = outline_for(silhouette)
@@ -152,7 +166,7 @@ def create_smooth_bird_frames() -> List[pygame.Surface]:
     lower_body = belly_coords
 
     frames: List[pygame.Surface] = []
-    wing_offsets = (-1, 1)
+    wing_offsets = (-3, 3)
 
     for offset in wing_offsets:
         surface = pygame.Surface((width, height), pygame.SRCALPHA)
@@ -170,15 +184,29 @@ def create_smooth_bird_frames() -> List[pygame.Surface]:
 
         wing_outline_coords = translate(wing_outline, dy=offset)
         wing_fill_coords = translate(wing_coords, dy=offset)
+        wing_inner = translate(wing_inner_coords, dy=offset)
         draw_coords(surface, wing_outline_coords, outline_color)
         draw_coords(surface, wing_fill_coords, wing_color)
+        draw_coords(surface, wing_inner, wing_shadow)
 
-        frames.append(surface)
+        if BIRD_SCALE != 1.0:
+            scaled_surface = pygame.transform.smoothscale(
+                surface,
+                (
+                    int(surface.get_width() * BIRD_SCALE),
+                    int(surface.get_height() * BIRD_SCALE),
+                ),
+            )
+        else:
+            scaled_surface = surface
+
+        frames.append(scaled_surface)
 
     return frames
 
 
 BIRD_FRAMES = create_smooth_bird_frames()
+BIRD_RADIUS = math.ceil(max(BIRD_FRAMES[0].get_width(), BIRD_FRAMES[0].get_height()) / 2)
 
 
 @dataclass
